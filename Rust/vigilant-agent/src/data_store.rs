@@ -54,7 +54,6 @@ mod tests {
         }
         match super::read_from_file(name) {
             Ok(s) if s == data => {
-                println!("data= {}", s);
                 std::fs::remove_file(dirs::home_dir().unwrap().join(".va").join(name)).unwrap();
             }
             _=> panic!()
