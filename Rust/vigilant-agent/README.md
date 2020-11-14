@@ -14,5 +14,6 @@ this is a tool to help people to:
 2. [ ] alarm like Pomodoro technique.
 3. [ ] show spending time in good charts.
 4. [ ] suggest now what should you do!
+    1. [ ] ask how did go!?
 5. [ ] todo managing
 6. [ ] event managing
