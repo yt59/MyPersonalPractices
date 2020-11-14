@@ -8,3 +8,7 @@ edition = "2018"
 
 [dependencies]
 dirs = "2.0"
+
+[[bin]]
+name = "vigilant_agent"
+path = "src/vigilant_agent.rs"
