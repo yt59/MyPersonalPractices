@@ -6,7 +6,7 @@ use std::path::Path;
 #[derive(Serialize, Deserialize)]
 struct Note {
     subject: String,
-    time: i64,
+    on: i64,
     explanation: String,
     conclusion: String,
     created: i64,
@@ -19,7 +19,7 @@ impl Note {
     pub fn new() -> Self {
         Note {
             subject: String::new(),
-            time: chrono::Local::now().timestamp(),
+            on: chrono::Local::now().timestamp(),
             explanation: String::new(),
             conclusion: String::new(),
             created: chrono::Local::now().timestamp(),
@@ -45,9 +45,9 @@ impl Note {
         }
         self
     }
-    pub fn time(&mut self, time: i64) -> &mut Self {
-        if time > 0 {
-            self.time = time;
+    pub fn on(&mut self, on: i64) -> &mut Self {
+        if on > 0 {
+            self.on = on;
         }
         self
     }
