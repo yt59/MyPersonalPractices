@@ -10,7 +10,3 @@ edition = "2018"
 dirs = "2.0"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-
-[[bin]]
-name = "vigilant_agent"
-path = "src/vigilant_agent.rs"
