@@ -13,9 +13,11 @@ struct Note {
     priority: u8,
     repeat: u8,
 }
+
+#[allow(dead_code)]
 impl Note {
-    pub fn new() -> Note {
-        let mut note = Note {
+    pub fn new() -> Self {
+        Note {
             subject: String::new(),
             time: chrono::Local::now().timestamp(),
             explanation: String::new(),
@@ -23,8 +25,7 @@ impl Note {
             created: chrono::Local::now().timestamp(),
             priority: 0,
             repeat: 1,
-        };
-        note
+        }
     }
     pub fn subject(&mut self, subject: String) -> &mut Self {
         if subject.len() > 0 {
@@ -75,9 +76,11 @@ struct Todo {
     priority: u8,
     done: bool,
 }
+
+#[allow(dead_code)]
 impl Todo {
-    pub fn new() -> Todo {
-        let mut todo = Todo {
+    pub fn new() -> Self {
+        Todo {
             title: String::new(),
             tag: String::new(),
             cause: String::new(),
@@ -85,8 +88,7 @@ impl Todo {
             due: chrono::Local::now().timestamp() + 3600,
             priority: 0,
             done: false,
-        };
-        todo
+        }
     }
     pub fn title(&mut self, title: String) -> &mut Self {
         if title.len() > 0 {
@@ -122,6 +124,7 @@ impl Todo {
     }
 }
 
+#[allow(dead_code)]
 fn read_from_file(name: &str) -> Result<String, std::io::Error> {
     std::fs::create_dir_all(dirs::home_dir().unwrap().join(Path::new(".va")))?;
     let mut file = OpenOptions::new()
@@ -140,7 +143,7 @@ fn read_from_file(name: &str) -> Result<String, std::io::Error> {
         Err(e) => Err(e),
     }
 }
-
+#[allow(dead_code)]
 fn write_to_file(data: String, name: &str) -> Result<(), std::io::Error> {
     std::fs::create_dir_all(dirs::home_dir().unwrap().join(Path::new(".va")))?;
     let mut file = OpenOptions::new()
