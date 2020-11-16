@@ -1,6 +1,27 @@
+use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::Path;
+
+#[derive(Serialize, Deserialize)]
+struct Note {
+    subject: String,
+    time: String,
+    explanation: String,
+    conclusion: String,
+    priority: u8,
+    repeat: u8,
+}
+#[derive(Serialize, Deserialize)]
+struct Todo {
+    name: String,
+    tag: String,
+    created: String,
+    cause: String,
+    due: String,
+    priority: u8,
+    done: bool
+}
 
 fn read_from_file(name: &str) -> Result<String, std::io::Error> {
     std::fs::create_dir_all(dirs::home_dir().unwrap().join(Path::new(".va")))?;
