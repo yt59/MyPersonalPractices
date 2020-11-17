@@ -1,9 +1,10 @@
+use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::Path;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, std::fmt::Debug)]
 struct Note {
     subject: String,
     on: i64,
@@ -19,10 +20,10 @@ impl Note {
     pub fn new() -> Self {
         Note {
             subject: String::new(),
-            on: chrono::Local::now().timestamp(),
+            on: Local::now().timestamp(),
             explanation: String::new(),
             conclusion: String::new(),
-            created: chrono::Local::now().timestamp(),
+            created: Local::now().timestamp(),
             priority: 0,
             repeat: 1,
         }
@@ -65,8 +66,35 @@ impl Note {
         self.priority = priority;
         self
     }
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
 }
-#[derive(Serialize, Deserialize)]
+
+impl std::fmt::Display for Note {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let tz = Local::now().timezone();
+        f.debug_struct("Note")
+            .field("subject", &self.subject)
+            .field(
+                "on",
+                &DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(self.on, 0), Utc)
+                    .with_timezone(&tz),
+            )
+            .field("explanation", &self.explanation)
+            .field("conclusion", &self.conclusion)
+            .field("repeat", &self.repeat)
+            .field("priority", &self.priority)
+            .field(
+                "created on",
+                &DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(self.on, 0), Utc)
+                    .with_timezone(&tz),
+            )
+            .finish()
+    }
+}
+
+#[derive(Serialize, Deserialize, std::fmt::Debug)]
 struct Todo {
     title: String,
     tag: String,
@@ -84,8 +112,8 @@ impl Todo {
             title: String::new(),
             tag: String::new(),
             cause: String::new(),
-            created: chrono::Local::now().timestamp(),
-            due: chrono::Local::now().timestamp() + 3600,
+            created: Local::now().timestamp(),
+            due: Local::now().timestamp() + 3600,
             priority: 0,
             done: false,
         }
@@ -121,6 +149,32 @@ impl Todo {
     pub fn done(&mut self, done: bool) -> &mut Self {
         self.done = done;
         self
+    }
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+}
+
+impl std::fmt::Display for Todo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let tz = Local::now().timezone();
+        f.debug_struct("Note")
+            .field("title", &self.title)
+            .field(
+                "due",
+                &DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(self.due, 0), Utc)
+                    .with_timezone(&tz),
+            )
+            .field("cause", &self.cause)
+            .field("tag", &self.tag)
+            .field("done", &self.done)
+            .field("priority", &self.priority)
+            .field(
+                "created on",
+                &DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(self.created, 0), Utc)
+                    .with_timezone(&tz),
+            )
+            .finish()
     }
 }
 
@@ -159,10 +213,11 @@ fn write_to_file(data: String, name: &str) -> Result<(), std::io::Error> {
 }
 
 mod tests {
+    use super::*;
     #[test]
     fn test_read_from_file() {
         let name = "test.txt";
-        match super::read_from_file(name) {
+        match read_from_file(name) {
             Ok(_s) => (),
             Err(_) => panic!(),
         }
@@ -171,15 +226,45 @@ mod tests {
     fn test_write_read_to_file() {
         let data = String::from("test data!");
         let name = "test.txt";
-        match super::write_to_file(data.clone(), name) {
+        match write_to_file(data.clone(), name) {
             Err(_e) => panic!(),
             _ => (),
         }
-        match super::read_from_file(name) {
+        match read_from_file(name) {
             Ok(s) if s == data => {
                 std::fs::remove_file(dirs::home_dir().unwrap().join(".va").join(name)).unwrap();
             }
             _ => panic!(),
         }
+    }
+    #[test]
+    fn test_create_note() {
+        let mut test = Note::new();
+        test.subject("test note".to_string())
+            .explanation("it's test note that happened this morning!".to_string())
+            .conclusion("TDD is good!".to_string())
+            .priority(255);
+        let mut array: Vec<&Note> = Vec::new();
+        array.push(&test);
+        let b_test = serde_json::to_vec(&array).unwrap();
+        let res: Vec<Note> = serde_json::from_slice(b_test.as_slice()).unwrap();
+        assert_eq!(res.first().unwrap().to_string(), test.to_string());
+        assert_eq!(res.first().unwrap().to_json(), test.to_json());
+    }
+    #[test]
+    fn test_create_todo() {
+        let mut test = Todo::new();
+        test.title("test note".to_string())
+            .tag("#urgent".to_string())
+            .cause("TDD is good!".to_string())
+            .priority(255)
+            .due(chrono::Local::now().timestamp())
+            .done(true);
+        let mut array: Vec<&Todo> = Vec::new();
+        array.push(&test);
+        let b_test = serde_json::to_vec(&array).unwrap();
+        let res: Vec<Todo> = serde_json::from_slice(b_test.as_slice()).unwrap();
+        assert_eq!(res.first().unwrap().to_json(), test.to_json());
+        assert_eq!(res.first().unwrap().to_string(), test.to_string());
     }
 }
