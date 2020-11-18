@@ -11,8 +11,7 @@ struct Note {
     explanation: String,
     conclusion: String,
     created: i64,
-    priority: u8,
-    repeat: u8,
+    priority: u8
 }
 
 #[allow(dead_code)]
@@ -24,8 +23,7 @@ impl Note {
             explanation: String::new(),
             conclusion: String::new(),
             created: Local::now().timestamp(),
-            priority: 0,
-            repeat: 1,
+            priority: 0
         }
     }
     pub fn subject(&mut self, subject: String) -> &mut Self {
@@ -52,16 +50,6 @@ impl Note {
         }
         self
     }
-    pub fn repeat(&mut self, repeat: u8) -> &mut Self {
-        if repeat > 1 {
-            self.repeat = repeat;
-        }
-        self
-    }
-    pub fn add_repeat(&mut self) -> &mut Self {
-        self.repeat = self.repeat + 1;
-        self
-    }
     pub fn priority(&mut self, priority: u8) -> &mut Self {
         self.priority = priority;
         self
@@ -83,7 +71,6 @@ impl std::fmt::Display for Note {
             )
             .field("explanation", &self.explanation)
             .field("conclusion", &self.conclusion)
-            .field("repeat", &self.repeat)
             .field("priority", &self.priority)
             .field(
                 "created on",

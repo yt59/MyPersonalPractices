@@ -1,0 +1,212 @@
+name: Vigilant Agent
+bin_name: va
+author: vayt <torsizi1414@gmail.com>
+about: Help to manage yourself
+settings: [ColorAuto, ArgRequiredElseHelp, ColoredHelp]          
+args:
+    - import:
+        short: i
+        long: import
+        takes_value: true
+        value_names:
+            - type
+            - JSON
+        help: takes an .json file contains an array of Todo OR an array of Note
+subcommands:
+    - note:
+        about: Manage your notes
+        settings: [SubcommandRequiredElseHelp, ColoredHelp, DisableVersion]
+        subcommands:
+            - import:
+                settings: [ColoredHelp, DisableVersion]
+                about: Import notes from a .json file
+                args:
+                    - JSONFILE:
+                        required: true
+            - create:
+                settings: [ColoredHelp, DisableVersion]
+                about: Create new note
+                args:
+                    - subject:
+                        help: Subject of note
+                        required: true
+                    - explanation:
+                        help: Description and full detailed explanation
+                        required: true
+                    - conclusion:
+                        help: Conclusion and point taken
+                        required: true
+                    - priority:
+                        help: Significance of note
+                        default_value: "0"
+                    - on:
+                        help: Occurrence Time
+            - list:
+                about: List notes
+                settings: [ColoredHelp, DisableVersion]
+            - remove:
+                about: Remove notes
+                settings: [ColoredHelp, DisableVersion]
+                args:
+                    - pattern:
+                        help: Required pattern to specify notes.
+                        required: true
+                        multiple: true
+                        default_value: "*"
+                        max_values: 5
+                    - match:
+                        short: m
+                        long: match
+                        help: Specify removing depth. 
+                        takes_value: true
+                        default_value: ONE
+                        possible_values: [ONE, TODAY, All]
+                    - force-remove:
+                        short: f
+                        long: force-remove
+                        help: Force remove silently 
+                        takes_value: false
+                    - json-config:
+                        long: json-config
+                        help: Specify notes with json
+                        takes_value: true
+            - update:
+                settings: [ColoredHelp, DisableVersion]
+                about: Updates one note.
+                args:
+                    - pattern:
+                        help: Required pattern to specify note.
+                        required: true
+                    - subject:
+                        short: s
+                        takes_value: true
+                        help: Subject of note
+                    - explanation:
+                        short: e
+                        takes_value: true
+                        help: Description and full detailed explanation
+                    - conclusion:
+                        short: c
+                        help: Conclusion and point taken
+                        takes_value: true
+                    - priority:
+                        short: p
+                        help: Significance of note
+                        takes_value: true
+                    - on:
+                        short: o
+                        takes_value: true
+                        help: Occurrence Time
+    - todo:
+        about: Manage your todo
+        settings: [SubcommandRequiredElseHelp, ColoredHelp, DisableVersion]
+        subcommands:
+            - import:
+                settings: [ColoredHelp, DisableVersion]
+                about: Imports todo from a .json file
+                args:
+                    - JSONFILE:
+                        required: true
+            - create:
+                settings: [ColoredHelp, DisableVersion]
+                about: Creates new todo
+                args:
+                    - title:
+                        help: Title of todo
+                        required: true
+                    - due:
+                        help: Deadline of todo
+                        default_value: TOMORROW
+                    - tag:
+                        help: Tags for faster access                        
+                    - cause:
+                        help: Reason of Creation
+                    - priority:
+                        help: Significance of todo
+                        default_value: "0"
+                    - created:
+                        help: Creation time
+                    - done:
+                        help: Status of todo done
+            - update:
+                settings: [ColoredHelp, DisableVersion]
+                about: Updates one todo.
+                args:
+                    - pattern:
+                        help: Required pattern to specify todo.
+                        required: true
+                    - title:
+                        short: n
+                        help: Title of todo
+                        takes_value: true
+                    - due:
+                        short: d
+                        help: Deadline of todo
+                        takes_value: true
+                    - tag:
+                        short: t
+                        takes_value: true
+                        help: Tags for faster access                        
+                    - cause:
+                        short: r
+                        takes_value: true
+                        help: Reason of Creation
+                    - priority:
+                        short: p
+                        help: Significance of todo
+                        takes_value: true
+                    - created:
+                        short: c
+                        takes_value: true
+                        help: Creation time
+                    - done:
+                        short: f
+                        takes_value: true
+                        help: Status of todo done
+            - check:
+                settings: [ColoredHelp, DisableVersion]
+                about: Marks todo as done
+                args:
+                    - pattern:
+                        help: Required pattern to specify todo.
+                        required: true
+                        multiple: true
+                        default_value: "*"
+                        max_values: 5
+                    - match:
+                        short: m
+                        long: match
+                        help: Specify marking depth. 
+                        takes_value: true
+                        default_value: ONE
+                        possible_values: [ONE, TODAY, All]
+            - list:
+                about: Shows todo list
+                settings: [ColoredHelp, DisableVersion]
+            - remove:
+                about: Removes todo
+                settings: [ColoredHelp, DisableVersion]
+                args:
+                    - pattern:
+                        help: Required pattern to specify todo.
+                        required: true
+                        multiple: true
+                        default_value: "*"
+                        max_values: 5
+                    - match:
+                        short: m
+                        long: match
+                        help: Specify removing depth. 
+                        takes_value: true
+                        default_value: ONE
+                        possible_values: [ONE, TODAY, All]
+                    - force-remove:
+                        short: f
+                        long: force-remove
+                        help: Force remove silently 
+                        takes_value: false
+                    - json-config:
+                        long: json-config
+                        help: Specify notes with json
+                        takes_value: true
+
