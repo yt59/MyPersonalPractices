@@ -1,19 +1,22 @@
 use chrono::{DateTime, Local, NaiveDateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize, Serializer};
+use serde_traitobject as s;
+use std::collections::HashMap;
+use std::fmt::{Debug, Display};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::any::Any;
 
-#[derive(Serialize, Deserialize, std::fmt::Debug)]
-struct Note {
+#[derive(Serialize, Deserialize, Debug)]
+pub(crate) struct Note {
     subject: String,
     on: i64,
     explanation: String,
     conclusion: String,
     created: i64,
-    priority: u8
+    priority: u8,
 }
-
 #[allow(dead_code)]
 impl Note {
     pub fn new() -> Self {
@@ -23,7 +26,7 @@ impl Note {
             explanation: String::new(),
             conclusion: String::new(),
             created: Local::now().timestamp(),
-            priority: 0
+            priority: 0,
         }
     }
     pub fn subject(&mut self, subject: String) -> &mut Self {
@@ -59,7 +62,7 @@ impl Note {
     }
 }
 
-impl std::fmt::Display for Note {
+impl Display for Note {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let tz = Local::now().timezone();
         f.debug_struct("Note")
@@ -80,9 +83,21 @@ impl std::fmt::Display for Note {
             .finish()
     }
 }
+impl Storable for Note {
+    fn debug_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(self, f)
+    }
 
-#[derive(Serialize, Deserialize, std::fmt::Debug)]
-struct Todo {
+    fn display_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+
+    // fn get_serialzer(&self){
+    //     Serialize::serialize(self, S)
+    // }
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub(crate) struct Todo {
     title: String,
     tag: String,
     created: i64,
@@ -91,7 +106,6 @@ struct Todo {
     priority: u8,
     done: bool,
 }
-
 #[allow(dead_code)]
 impl Todo {
     pub fn new() -> Self {
@@ -142,7 +156,7 @@ impl Todo {
     }
 }
 
-impl std::fmt::Display for Todo {
+impl Display for Todo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let tz = Local::now().timezone();
         f.debug_struct("Note")
@@ -164,6 +178,106 @@ impl std::fmt::Display for Todo {
             .finish()
     }
 }
+
+impl Storable for Todo {
+    fn debug_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(self, f)
+    }
+
+    fn display_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+pub trait Storable: s::Serialize + s::Deserialize + Any + 'static {
+    fn debug_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+    fn display_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+    // fn get_serialzer<S: Serializer>(&self, serializer: &S) -> Result<S::Ok, S::Error>;
+}
+impl Debug for dyn Storable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.debug_fmt(f)
+    }
+}
+impl Display for dyn Storable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.display_fmt(f)
+    }
+}
+// impl Serialize for dyn Storable{
+//     fn serialize(&self, serializer: Serializer::) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer {
+//             self.get_serialzer(serializer)
+//     }
+// }
+
+#[derive(Serialize, Deserialize)]
+pub(crate) struct Store{
+    // #[serde(with = "serde_traitobject")]
+    data: HashMap<String, Vec<s::Box<dyn Storable>>>,
+}
+impl Store {
+    // pub fn new() -> Self {
+    //     Self(HashMap::new())
+    // }
+    // pub fn add<S: Storable+'static>(&mut self, data: S) {
+    //     let key = std::any::type_name::<S>().to_string();
+    //     if self.0.contains_key(&key) {
+    //         self.0.get_mut(&key).unwrap().push(Box::new(data))
+    //     } else {
+    //         self.0.insert(key, vec![Box::new(data)]);
+    //     }
+    // }
+    pub fn show(&self) {
+        // println!("{:#?}", self);
+    }
+}
+
+// impl Store {
+//     pub fn load() -> Result<Store, std::io::Error> {
+//         match read_from_file("store.json") {
+//             Ok(data) => Ok(serde_json::from_str(&data).unwrap_or_else(|_| -> Store {
+//                 eprintln!("ERROR: FAILED TO PARSE 'store.json'");
+//                 std::fs::rename(
+//                     dirs::home_dir().unwrap().join(Path::new(".va/store.json")),
+//                     dirs::home_dir()
+//                         .unwrap()
+//                         .join(Path::new(".va/store.json_ERR")),
+//                 )
+//                 .unwrap();
+//                 println!("LOG: old file renamed to store.json_ERR");
+//                 Store {
+//                     todo: Vec::new(),
+//                     note: Vec::new(),
+//                 }
+//             })),
+//             Err(e) => Err(e),
+//         }
+//     }
+//     pub fn save(&self) -> Result<(), std::io::Error> {
+//         let data = serde_json::to_string(&self).unwrap();
+//         write_to_file(data, "store.json")
+//     }
+//     pub fn add<T>(&mut self, note: T) {
+//         self.note.push(note);
+//     }
+//     pub fn add_vec_note(&mut self, notes: Vec<Note>) {
+//         todo!()
+//     }
+//     pub fn find_note(&self, pattern: &str) -> &Note {
+//         todo!()
+//     }
+//     pub fn find_all_note(&self, pattern: &str) -> Vec<&Note> {
+//         todo!()
+//     }
+//     pub fn remove_note(&mut self, note: &Note) -> Option<Note> {
+//         todo!()
+//     }
+//     pub fn remove_vec_note(&mut self, notes: Vec<&Note>) -> Vec<Note> {
+//         todo!()
+//     }
+// }
 
 #[allow(dead_code)]
 fn read_from_file(name: &str) -> Result<String, std::io::Error> {
@@ -199,20 +313,26 @@ fn write_to_file(data: String, name: &str) -> Result<(), std::io::Error> {
     file.write_all(data.as_bytes())
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn test_read_from_file() {
-        let name = "test.txt";
+        let name = "test_read_from_file.txt";
         match read_from_file(name) {
-            Ok(_s) => (),
+            Ok(_s) => std::fs::remove_file(
+                dirs::home_dir()
+                    .unwrap()
+                    .join(Path::new(&format!(".va/test_read_from_file.txt"))),
+            )
+            .unwrap(),
             Err(_) => panic!(),
         }
     }
     #[test]
     fn test_write_read_to_file() {
         let data = String::from("test data!");
-        let name = "test.txt";
+        let name = "test_write_read_to_file.txt";
         match write_to_file(data.clone(), name) {
             Err(_e) => panic!(),
             _ => (),
@@ -254,4 +374,12 @@ mod tests {
         assert_eq!(res.first().unwrap().to_json(), test.to_json());
         assert_eq!(res.first().unwrap().to_string(), test.to_string());
     }
+    // #[test]
+    // fn test_load_store() {
+    //     Store::load().unwrap();
+    // }
+    // #[test]
+    // fn test_load_save_store() {
+    //     Store::load().unwrap().save().unwrap()
+    // }
 }
