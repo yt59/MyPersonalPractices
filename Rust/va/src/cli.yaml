@@ -23,6 +23,10 @@ subcommands:
             args:
               - JSONFILE:
                   required: true
+                  validator_regex:
+                    - "[a-zA-Z0-9]+.json"
+                    - error message
+
         - create:
             settings: [ColoredHelp, DisableVersion]
             about: Create new note

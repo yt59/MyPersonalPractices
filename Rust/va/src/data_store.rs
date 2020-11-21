@@ -1,14 +1,12 @@
 use chrono::{DateTime, Local, NaiveDateTime, Utc};
-use serde::{de, Deserialize, Serialize, Serializer};
-use serde_traitobject as s;
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, collections::HashSet, hash::Hash};
 use std::fmt::{Debug, Display};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::Path;
-use std::any::Any;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Hash)]
 pub(crate) struct Note {
     subject: String,
     on: i64,
@@ -84,17 +82,9 @@ impl Display for Note {
     }
 }
 impl Storable for Note {
-    fn debug_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self, f)
+    fn to_json(&self) -> String {
+        serde_json::to_string(&self).unwrap()
     }
-
-    fn display_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(self, f)
-    }
-
-    // fn get_serialzer(&self){
-    //     Serialize::serialize(self, S)
-    // }
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct Todo {
@@ -180,104 +170,159 @@ impl Display for Todo {
 }
 
 impl Storable for Todo {
-    fn debug_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self, f)
-    }
-
-    fn display_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(self, f)
+    fn to_json(&self) -> String {
+        serde_json::to_string(&self).unwrap()
     }
 }
 
-pub trait Storable: s::Serialize + s::Deserialize + Any + 'static {
-    fn debug_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-    fn display_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-    // fn get_serialzer<S: Serializer>(&self, serializer: &S) -> Result<S::Ok, S::Error>;
+pub trait Storable: Debug + Display {
+    fn to_json(&self) -> String;
 }
-impl Debug for dyn Storable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.debug_fmt(f)
-    }
-}
-impl Display for dyn Storable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.display_fmt(f)
-    }
-}
-// impl Serialize for dyn Storable{
-//     fn serialize(&self, serializer: Serializer::) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer {
-//             self.get_serialzer(serializer)
-//     }
-// }
 
-#[derive(Serialize, Deserialize)]
-pub(crate) struct Store{
-    // #[serde(with = "serde_traitobject")]
-    data: HashMap<String, Vec<s::Box<dyn Storable>>>,
+impl Hash for Box<dyn Storable>{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state)
+    }
 }
+impl PartialEq for Box<dyn Storable>{
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string().eq(&other.to_string())
+    }
+}
+impl Eq for Box<dyn Storable>{
+    fn assert_receiver_is_total_eq(&self) {
+        
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Store(HashMap<String, HashSet<Box<dyn Storable>>>);
+
 impl Store {
-    // pub fn new() -> Self {
-    //     Self(HashMap::new())
-    // }
-    // pub fn add<S: Storable+'static>(&mut self, data: S) {
-    //     let key = std::any::type_name::<S>().to_string();
-    //     if self.0.contains_key(&key) {
-    //         self.0.get_mut(&key).unwrap().push(Box::new(data))
-    //     } else {
-    //         self.0.insert(key, vec![Box::new(data)]);
-    //     }
-    // }
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+    pub fn load() -> Result<Store, std::io::Error> {
+        match read_from_file("store.json") {
+            Ok(data) => {
+                let des: HashMap<String, Vec<String>> = serde_json::from_str(&data).unwrap_or_else(
+                    |_| -> HashMap<String, Vec<String>> {
+                        eprintln!("ERROR: FAILED TO PARSE 'store.json'");
+                        std::fs::rename(
+                            dirs::home_dir().unwrap().join(Path::new(".va/store.json")),
+                            dirs::home_dir()
+                                .unwrap()
+                                .join(Path::new(".va/store.json_ERR")),
+                        )
+                        .unwrap();
+                        println!("LOG: old file renamed to store.json_ERR");
+                        HashMap::new()
+                    },
+                );
+                let mut store = Store(HashMap::new());
+                des.into_iter().for_each(|(k, v)| {
+                    let value: HashSet<Box<dyn Storable>> = match &k[..] {
+                        "va::data_store::Note" => {
+                            let mut data: HashSet<Box<dyn Storable>> = HashSet::new();
+                            v.into_iter().for_each(|s| {
+                                let note: Note = serde_json::from_str(&s).unwrap();
+                                data.insert(Box::new(note));
+                            });
+                            data
+                        }
+                        "va::data_store::Todo" => {
+                            let mut data: HashSet<Box<dyn Storable>> = HashSet::new();
+                            v.into_iter().for_each(|s| {
+                                let todo: Todo = serde_json::from_str(&s).unwrap();
+                                data.insert(Box::new(todo));
+                            });
+                            data
+                        }
+                        _ => panic!("Unknown Key"),
+                    };
+                    store.0.insert(k, value);
+                });
+                Ok(store)
+            }
+            Err(e) => Err(e),
+        }
+    }
+    pub fn save(&self) -> Result<(), std::io::Error> {
+        let serializable: HashMap<String, Vec<String>> = self
+            .0
+            .iter()
+            .map(|(key, val)| {
+                let ds: Vec<String> = val.iter().map(|data| data.as_ref().to_json()).collect();
+                (key.clone(), ds)
+            })
+            .collect();
+        let data = serde_json::to_string(&serializable).unwrap();
+        write_to_file(data, "store.json")
+    }
+    pub fn add<S: Storable + 'static>(&mut self, data: S) {
+        let key = std::any::type_name::<S>().to_string();
+        if self.0.contains_key(&key) {
+            self.0.get_mut(&key).unwrap().insert(Box::new(data));
+        } else {
+            let mut value:HashSet<Box<dyn Storable>> = HashSet::new();
+            value.insert(Box::new(data));
+            self.0.insert(key, value);
+        }
+    }
     pub fn show(&self) {
-        // println!("{:#?}", self);
+        println!("{:#?}", self);
+    }
+    pub fn add_vec<S: Storable + 'static>(&mut self, data: Vec<S>) {
+        let key = std::any::type_name::<S>().to_string();
+        if self.0.contains_key(&key) {
+            data.into_iter().for_each(|n| {
+                self.0.get_mut(&key).unwrap().insert(Box::new(n));
+            })
+        } else {
+            let mut value: HashSet<Box<dyn Storable>> = HashSet::new();
+            data.into_iter().for_each(|n| {
+                value.insert(Box::new(n));
+            });
+            self.0.insert(key, value);
+        }
+    }
+    pub fn find_note(&self, pattern: &str) -> &Note {
+        todo!()
+    }
+    pub fn find_all_note(&self, pattern: &str) -> Vec<&Note> {
+        todo!()
+    }
+    pub fn remove<S: Storable>(&mut self, data: &Box<dyn Storable>, _s:S) -> bool {
+        let key = std::any::type_name::<S>().to_string();
+        if self.0.contains_key(&key) {
+            let mut value : HashSet<Box<dyn Storable>>= self.0.get_mut(&key).unwrap().drain().collect();
+            match value.remove(data){
+                true => {
+                    self.0.insert(key, value);
+                    true
+                },
+                false => false
+            }
+        } else {
+            false
+        }
+    }
+    pub fn remove_vec<S: Storable>(&mut self, data: Vec<&Box<dyn Storable>>, _s:S) -> bool {
+        let key = std::any::type_name::<S>().to_string();
+        if self.0.contains_key(&key) {
+            let mut value : HashSet<Box<dyn Storable>>= self.0.get_mut(&key).unwrap().drain().collect();
+            match data.into_iter().map(|d|value.remove(d)).any(|x|x) {
+                true => {
+                    self.0.insert(key, value);
+                    true
+                },
+                false => false
+            }
+        } else {
+            false
+        }
     }
 }
-
-// impl Store {
-//     pub fn load() -> Result<Store, std::io::Error> {
-//         match read_from_file("store.json") {
-//             Ok(data) => Ok(serde_json::from_str(&data).unwrap_or_else(|_| -> Store {
-//                 eprintln!("ERROR: FAILED TO PARSE 'store.json'");
-//                 std::fs::rename(
-//                     dirs::home_dir().unwrap().join(Path::new(".va/store.json")),
-//                     dirs::home_dir()
-//                         .unwrap()
-//                         .join(Path::new(".va/store.json_ERR")),
-//                 )
-//                 .unwrap();
-//                 println!("LOG: old file renamed to store.json_ERR");
-//                 Store {
-//                     todo: Vec::new(),
-//                     note: Vec::new(),
-//                 }
-//             })),
-//             Err(e) => Err(e),
-//         }
-//     }
-//     pub fn save(&self) -> Result<(), std::io::Error> {
-//         let data = serde_json::to_string(&self).unwrap();
-//         write_to_file(data, "store.json")
-//     }
-//     pub fn add<T>(&mut self, note: T) {
-//         self.note.push(note);
-//     }
-//     pub fn add_vec_note(&mut self, notes: Vec<Note>) {
-//         todo!()
-//     }
-//     pub fn find_note(&self, pattern: &str) -> &Note {
-//         todo!()
-//     }
-//     pub fn find_all_note(&self, pattern: &str) -> Vec<&Note> {
-//         todo!()
-//     }
-//     pub fn remove_note(&mut self, note: &Note) -> Option<Note> {
-//         todo!()
-//     }
-//     pub fn remove_vec_note(&mut self, notes: Vec<&Note>) -> Vec<Note> {
-//         todo!()
-//     }
-// }
 
 #[allow(dead_code)]
 fn read_from_file(name: &str) -> Result<String, std::io::Error> {
@@ -374,12 +419,12 @@ mod tests {
         assert_eq!(res.first().unwrap().to_json(), test.to_json());
         assert_eq!(res.first().unwrap().to_string(), test.to_string());
     }
-    // #[test]
-    // fn test_load_store() {
-    //     Store::load().unwrap();
-    // }
-    // #[test]
-    // fn test_load_save_store() {
-    //     Store::load().unwrap().save().unwrap()
-    // }
+    #[test]
+    fn test_load_store() {
+        Store::load().unwrap().show();
+    }
+    #[test]
+    fn test_load_save_store() {
+        Store::load().unwrap().save().unwrap()
+    }
 }
