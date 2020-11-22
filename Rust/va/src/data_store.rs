@@ -1,10 +1,13 @@
 use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, collections::HashSet, hash::Hash};
-use std::fmt::{Debug, Display};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::{
+    any::Any,
+    fmt::{Debug, Display},
+};
+use std::{collections::HashMap, collections::HashSet, hash::Hash};
 
 #[derive(Serialize, Deserialize, Debug, Hash)]
 pub(crate) struct Note {
@@ -179,25 +182,24 @@ pub trait Storable: Debug + Display {
     fn to_json(&self) -> String;
 }
 
-impl Hash for Box<dyn Storable>{
+impl Hash for Box<dyn Storable> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.to_string().hash(state)
     }
 }
-impl PartialEq for Box<dyn Storable>{
+impl PartialEq for Box<dyn Storable> {
     fn eq(&self, other: &Self) -> bool {
         self.to_string().eq(&other.to_string())
     }
 }
-impl Eq for Box<dyn Storable>{
-    fn assert_receiver_is_total_eq(&self) {
-        
-    }
+impl Eq for Box<dyn Storable> {
+    fn assert_receiver_is_total_eq(&self) {}
 }
 
 #[derive(Debug)]
 pub(crate) struct Store(HashMap<String, HashSet<Box<dyn Storable>>>);
 
+#[allow(dead_code)]
 impl Store {
     pub fn new() -> Self {
         Self(HashMap::new())
@@ -259,18 +261,18 @@ impl Store {
         let data = serde_json::to_string(&serializable).unwrap();
         write_to_file(data, "store.json")
     }
+    pub fn show(&self) {
+        println!("{:#?}", self);
+    }
     pub fn add<S: Storable + 'static>(&mut self, data: S) {
         let key = std::any::type_name::<S>().to_string();
         if self.0.contains_key(&key) {
             self.0.get_mut(&key).unwrap().insert(Box::new(data));
         } else {
-            let mut value:HashSet<Box<dyn Storable>> = HashSet::new();
+            let mut value: HashSet<Box<dyn Storable>> = HashSet::new();
             value.insert(Box::new(data));
             self.0.insert(key, value);
         }
-    }
-    pub fn show(&self) {
-        println!("{:#?}", self);
     }
     pub fn add_vec<S: Storable + 'static>(&mut self, data: Vec<S>) {
         let key = std::any::type_name::<S>().to_string();
@@ -286,40 +288,85 @@ impl Store {
             self.0.insert(key, value);
         }
     }
-    pub fn find_note(&self, pattern: &str) -> &Note {
-        todo!()
+    pub fn find<S: Storable>(&self, pattern: &str) -> Option<Vec<String>> {
+        let key = std::any::type_name::<S>().to_string();
+        match self.0.contains_key(&key) {
+            true => {
+                let mut searchable: HashSet<_> = self
+                    .0
+                    .get(&key)
+                    .unwrap()
+                    .iter()
+                    .map(|data| data.to_json())
+                    .into_iter()
+                    .collect();
+                searchable.retain(|text| text.contains(pattern));
+                let found: Vec<_> = searchable
+                    .into_iter()
+                    .collect();
+                match found.is_empty() {
+                    true => None,
+                    false => Some(found),
+                }
+            }
+            _ => None,
+        }
     }
-    pub fn find_all_note(&self, pattern: &str) -> Vec<&Note> {
-        todo!()
-    }
-    pub fn remove<S: Storable>(&mut self, data: &Box<dyn Storable>, _s:S) -> bool {
+    pub fn remove<S: Storable>(&mut self, data: &Box<dyn Storable>) -> bool {
         let key = std::any::type_name::<S>().to_string();
         if self.0.contains_key(&key) {
-            let mut value : HashSet<Box<dyn Storable>>= self.0.get_mut(&key).unwrap().drain().collect();
-            match value.remove(data){
+            let mut value: HashSet<Box<dyn Storable>> =
+                self.0.get_mut(&key).unwrap().drain().collect();
+            match value.remove(data) {
                 true => {
                     self.0.insert(key, value);
                     true
-                },
-                false => false
+                }
+                false => false,
             }
         } else {
             false
         }
     }
-    pub fn remove_vec<S: Storable>(&mut self, data: Vec<&Box<dyn Storable>>, _s:S) -> bool {
+    pub fn remove_vec<S: Storable>(&mut self, data: Vec<&Box<dyn Storable>>) -> bool {
         let key = std::any::type_name::<S>().to_string();
         if self.0.contains_key(&key) {
-            let mut value : HashSet<Box<dyn Storable>>= self.0.get_mut(&key).unwrap().drain().collect();
-            match data.into_iter().map(|d|value.remove(d)).any(|x|x) {
+            let mut value: HashSet<Box<dyn Storable>> =
+                self.0.get_mut(&key).unwrap().drain().collect();
+            match data.into_iter().map(|d| value.remove(d)).any(|x| x) {
                 true => {
                     self.0.insert(key, value);
                     true
-                },
-                false => false
+                }
+                false => {
+                    self.0.insert(key, value);
+                    false
+                }
             }
         } else {
             false
+        }
+    }
+    pub fn remove_all<S: Storable>(&mut self) -> Option<Vec<Box<dyn Storable>>> {
+        let key = std::any::type_name::<S>().to_string();
+        match self.0.remove(&key) {
+            None => None,
+            Some(value) => Some(value.into_iter().collect()),
+        }
+    }
+    pub fn replace<S: Storable>(&mut self, old: &Box<dyn Storable>, new: Box<dyn Storable>)-> bool {
+        let key = std::any::type_name::<S>().to_string();
+        match self.0.contains_key(&key) {
+            false => false,
+            true => {
+                match self.0.get_mut(&key).unwrap().take(old){
+                    Some(_) => {
+                        self.0.get_mut(&key).unwrap().insert(new);
+                        true
+                    }
+                    None => false
+                }
+            }
         }
     }
 }
@@ -349,6 +396,7 @@ fn write_to_file(data: String, name: &str) -> Result<(), std::io::Error> {
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
+        .truncate(true)
         .open(
             dirs::home_dir()
                 .unwrap()

@@ -16,14 +16,18 @@ fn main() {
     dc1.tag("Tag test".to_string());
     // s.add_note(note);
     // s.save()
-    let mut store = data_store::Store::new();
-    store.add(note);
-    store.add(a);
-    store.show();
-    store.add(dc);
-    store.add(dc1);
-    store.remove(&(Box::new(data_store::Note::new()) as Box<dyn data_store::Storable>), data_store::Note::new());
-    store.show();
+    let mut store = data_store::Store::load().unwrap();
+    // store.add(note);
+    // store.add(a);
+    // store.show();
+    // store.add(dc);
+    // store.add(dc1);
+    let up =store.find::<data_store::Note>("lalala").unwrap();
+    let old: data_store::Note = serde_json::from_str(up.first().unwrap()).unwrap();
+    let o: Box<dyn data_store::Storable> = Box::new(old);
+    let mut new = data_store::Note::new();
+    new.explanation("it changed".to_string());
+    dbg!(store.replace::<data_store::Note>(& o, Box::new(new)));
     store.save().unwrap();
 
     println!("{}",std::any::type_name::<data_store::Note>());
