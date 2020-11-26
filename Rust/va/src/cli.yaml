@@ -8,10 +8,11 @@ args:
       short: i
       long: import
       takes_value: true
-      value_names:
-        - type
-        - JSON
+      value_name: JSON
       help: takes an .json file contains an array of Todo OR an array of Note
+      validator_regex: 
+        - "[a-zA-Z0-9]+.json"
+        - "expected a .json file"
 subcommands:
   - note:
       about: Manage your notes
@@ -25,7 +26,7 @@ subcommands:
                   required: true
                   validator_regex:
                     - "[a-zA-Z0-9]+.json"
-                    - error message
+                    - "expected a .json file"
 
         - create:
             settings: [ColoredHelp, DisableVersion]
@@ -111,6 +112,9 @@ subcommands:
             args:
               - JSONFILE:
                   required: true
+                  validator_regex:
+                    - "[a-zA-Z0-9]+.json"
+                    - "expected a .json file"
         - create:
             settings: [ColoredHelp, DisableVersion]
             about: Creates new todo

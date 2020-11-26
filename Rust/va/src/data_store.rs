@@ -2,7 +2,7 @@ use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{
     any::Any,
     fmt::{Debug, Display},
@@ -204,50 +204,106 @@ impl Store {
     pub fn new() -> Self {
         Self(HashMap::new())
     }
-    pub fn load() -> Result<Store, std::io::Error> {
-        match read_from_file("store.json") {
-            Ok(data) => {
-                let des: HashMap<String, Vec<String>> = serde_json::from_str(&data).unwrap_or_else(
-                    |_| -> HashMap<String, Vec<String>> {
-                        eprintln!("ERROR: FAILED TO PARSE 'store.json'");
-                        std::fs::rename(
-                            dirs::home_dir().unwrap().join(Path::new(".va/store.json")),
-                            dirs::home_dir()
-                                .unwrap()
-                                .join(Path::new(".va/store.json_ERR")),
-                        )
-                        .unwrap();
-                        println!("LOG: old file renamed to store.json_ERR");
-                        HashMap::new()
-                    },
-                );
-                let mut store = Store(HashMap::new());
-                des.into_iter().for_each(|(k, v)| {
-                    let value: HashSet<Box<dyn Storable>> = match &k[..] {
-                        "va::data_store::Note" => {
-                            let mut data: HashSet<Box<dyn Storable>> = HashSet::new();
-                            v.into_iter().for_each(|s| {
-                                let note: Note = serde_json::from_str(&s).unwrap();
-                                data.insert(Box::new(note));
-                            });
-                            data
-                        }
-                        "va::data_store::Todo" => {
-                            let mut data: HashSet<Box<dyn Storable>> = HashSet::new();
-                            v.into_iter().for_each(|s| {
-                                let todo: Todo = serde_json::from_str(&s).unwrap();
-                                data.insert(Box::new(todo));
-                            });
-                            data
-                        }
-                        _ => panic!("Unknown Key"),
-                    };
-                    store.0.insert(k, value);
-                });
-                Ok(store)
-            }
+    fn _load_note(
+        hs: &mut HashSet<Box<dyn Storable>>,
+        raw: Vec<String>,
+    ) -> Result<(), serde_json::Error> {
+        raw.into_iter()
+            .map(|s| match serde_json::from_str::<Note>(&s) {
+                Ok(v) => {
+                    hs.insert(Box::new(v));
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            })
+            .take_while(|x| x.is_ok())
+            .fold(Ok(()), |acc, x| if acc.is_err() { acc } else { x })
+    }
+    fn _load_todo(
+        hs: &mut HashSet<Box<dyn Storable>>,
+        raw: Vec<String>,
+    ) -> Result<(), serde_json::Error> {
+        raw.into_iter()
+            .map(|s| match serde_json::from_str::<Todo>(&s) {
+                Ok(v) => {
+                    hs.insert(Box::new(v));
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            })
+            .take_while(|x| x.is_ok())
+            .fold(Ok(()), |acc, x| if acc.is_err() { acc } else { x })
+    }
+    fn load_value(
+        key: &String,
+        raw: Vec<String>,
+    ) -> Result<HashSet<Box<dyn Storable>>, serde_json::Error> {
+        let mut value: HashSet<Box<dyn Storable>> = HashSet::new();
+        match match &key[..] {
+            "va::data_store::Note" => Store::_load_note(&mut value, raw),
+            "va::data_store::Todo" => Store::_load_todo(&mut value, raw),
+            _ => panic!("UNKNOWN KEY!")
+        } {
+            Ok(_) => Ok(value),
             Err(e) => Err(e),
         }
+    }
+    fn load_store(hm: HashMap<String, Vec<String>>) -> Result<Store, serde_json::Error> {
+        let mut store = Store(HashMap::new());
+        match hm
+            .into_iter()
+            .map(|(k, v)| match Store::load_value(&k, v) {
+                Ok(value) => {
+                    store.0.insert(k, value);
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            })
+            .take_while(|x| x.is_ok())
+            .fold(Ok(()), |acc, x| if acc.is_err() { acc } else { x })
+        {
+            Ok(_) => Ok(store),
+            Err(e) => Err(e),
+        }
+    }
+    fn load_file(path: PathBuf) -> Result<String, std::io::Error> {
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)
+            .unwrap();
+        let mut result = String::new();
+        match file.read_to_string(&mut result) {
+            Ok(_) => Ok(result),
+            Err(e) => Err(e),
+        }
+    }
+    pub fn load() -> Result<Store, std::io::Error> {
+        std::fs::create_dir_all(dirs::home_dir().unwrap().join(Path::new(".va")))?;
+        let path = dirs::home_dir().unwrap().join(Path::new(".va/store.json"));
+        let data: String = Store::load_file(path)?;
+        let eh = |_| {
+            eprintln!("ERROR: FAILED TO PARSE 'store.json'");
+            std::fs::rename(
+                dirs::home_dir().unwrap().join(Path::new(".va/store.json")),
+                dirs::home_dir()
+                    .unwrap()
+                    .join(Path::new(".va/store.json_ERR")),
+            )
+            .unwrap();
+            println!("LOG: old file renamed to store.json_ERR");
+        };
+        let data = serde_json::from_str::<HashMap<String, Vec<String>>>(&data).unwrap_or_else(
+            |e| -> HashMap<String, Vec<String>> {
+                eh(e);
+                HashMap::new()
+            },
+        );
+        Ok(Store::load_store(data).unwrap_or_else(|e| -> Store {
+            eh(e);
+            Store(HashMap::new())
+        }))
     }
     pub fn save(&self) -> Result<(), std::io::Error> {
         let serializable: HashMap<String, Vec<String>> = self
@@ -301,9 +357,7 @@ impl Store {
                     .into_iter()
                     .collect();
                 searchable.retain(|text| text.contains(pattern));
-                let found: Vec<_> = searchable
-                    .into_iter()
-                    .collect();
+                let found: Vec<_> = searchable.into_iter().collect();
                 match found.is_empty() {
                     true => None,
                     false => Some(found),
@@ -354,19 +408,21 @@ impl Store {
             Some(value) => Some(value.into_iter().collect()),
         }
     }
-    pub fn replace<S: Storable>(&mut self, old: &Box<dyn Storable>, new: Box<dyn Storable>)-> bool {
+    pub fn replace<S: Storable>(
+        &mut self,
+        old: &Box<dyn Storable>,
+        new: Box<dyn Storable>,
+    ) -> bool {
         let key = std::any::type_name::<S>().to_string();
         match self.0.contains_key(&key) {
             false => false,
-            true => {
-                match self.0.get_mut(&key).unwrap().take(old){
-                    Some(_) => {
-                        self.0.get_mut(&key).unwrap().insert(new);
-                        true
-                    }
-                    None => false
+            true => match self.0.get_mut(&key).unwrap().take(old) {
+                Some(_) => {
+                    self.0.get_mut(&key).unwrap().insert(new);
+                    true
                 }
-            }
+                None => false,
+            },
         }
     }
 }

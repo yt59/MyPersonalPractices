@@ -1,35 +1,14 @@
 mod data_store;
 extern crate clap;
+use data_store::{Note, Todo, Store};
 use clap::{App, load_yaml, crate_version};
 
 fn main() {
-    // The YAML file is found relative to the current file, similar to how modules are found
-    let yaml = load_yaml!("cli.yaml");
-    // let _matches = App::from(yaml).version(crate_version!()).get_matches();
-    // let mut s = data_store::Store::load().unwrap();
-    let mut note = data_store::Note::new();
-    note.priority(50);
-    let mut dc = data_store::Todo::new();
-    dc.title("Todo".to_string());
-    let mut dc1 = data_store::Todo::new();
-    let a = data_store::Note::new();
-    dc1.tag("Tag test".to_string());
-    // s.add_note(note);
-    // s.save()
-    let mut store = data_store::Store::load().unwrap();
-    // store.add(note);
-    // store.add(a);
-    // store.show();
-    // store.add(dc);
-    // store.add(dc1);
-    let up =store.find::<data_store::Note>("lalala").unwrap();
-    let old: data_store::Note = serde_json::from_str(up.first().unwrap()).unwrap();
-    let o: Box<dyn data_store::Storable> = Box::new(old);
-    let mut new = data_store::Note::new();
-    new.explanation("it changed".to_string());
-    dbg!(store.replace::<data_store::Note>(& o, Box::new(new)));
-    store.save().unwrap();
-
-    println!("{}",std::any::type_name::<data_store::Note>());
-    // Same as previous examples...
+    // let yaml = load_yaml!("cli.yaml");
+    // let matches = App::from(yaml).version(crate_version!()).get_matches();
+    // if let Some(store_file) = matches.value_of("import"){
+    //     println!("get {}", store_file);
+    // }
+    let s =Store::load();
+    s.unwrap().show();
 }
