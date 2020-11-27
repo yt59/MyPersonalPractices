@@ -10,7 +10,7 @@ args:
       takes_value: true
       value_name: JSON
       help: takes an .json file contains an array of Todo OR an array of Note
-      validator_regex: 
+      validator_regex:
         - "[a-zA-Z0-9]+.json"
         - "expected a .json file"
 subcommands:
@@ -27,7 +27,6 @@ subcommands:
                   validator_regex:
                     - "[a-zA-Z0-9]+.json"
                     - "expected a .json file"
-
         - create:
             settings: [ColoredHelp, DisableVersion]
             about: Create new note
@@ -44,20 +43,24 @@ subcommands:
               - priority:
                   help: Significance of note
                   default_value: "0"
+                  validator_regex:
+                    - "^[\\d]+$"
+                    - "expected a positive number"
               - on:
                   help: Occurrence Time
         - list:
             about: List notes
             settings: [ColoredHelp, DisableVersion]
+            args:
+              - pattern:
+                  help: pattern to filter results.
         - remove:
             about: Remove notes
             settings: [ColoredHelp, DisableVersion]
             args:
               - pattern:
                   help: Required pattern to specify notes.
-                  required: true
                   multiple: true
-                  default_value: "*"
                   max_values: 5
               - match:
                   short: m
@@ -98,6 +101,9 @@ subcommands:
                   short: p
                   help: Significance of note
                   takes_value: true
+                  validator_regex:
+                    - "^[\\d]+$"
+                    - "expected a positive number"
               - on:
                   short: o
                   takes_value: true
@@ -132,10 +138,13 @@ subcommands:
               - priority:
                   help: Significance of todo
                   default_value: "0"
-              - created:
-                  help: Creation time
+                  validator_regex:
+                    - "^[\\d]+$"
+                    - "expected a positive number"
               - done:
                   help: Status of todo done
+                  possible_values: ["true", "false"]
+                  default_value: "false"
         - update:
             settings: [ColoredHelp, DisableVersion]
             about: Updates one todo.
@@ -163,13 +172,14 @@ subcommands:
                   short: p
                   help: Significance of todo
                   takes_value: true
-              - created:
-                  short: c
-                  takes_value: true
-                  help: Creation time
+                  validator_regex:
+                    - "^[\\d]+$"
+                    - "expected a positive number"
               - done:
                   short: f
                   takes_value: true
+                  possible_values: ["true", "false"]
+                  default_value: "false"
                   help: Status of todo done
         - check:
             settings: [ColoredHelp, DisableVersion]
@@ -177,9 +187,7 @@ subcommands:
             args:
               - pattern:
                   help: Required pattern to specify todo.
-                  required: true
                   multiple: true
-                  default_value: "*"
                   max_values: 5
               - match:
                   short: m
@@ -191,15 +199,16 @@ subcommands:
         - list:
             about: Shows todo list
             settings: [ColoredHelp, DisableVersion]
+            args:
+              - pattern:
+                  help: pattern to filter results.
         - remove:
             about: Removes todo
             settings: [ColoredHelp, DisableVersion]
             args:
               - pattern:
                   help: Required pattern to specify todo.
-                  required: true
                   multiple: true
-                  default_value: "*"
                   max_values: 5
               - match:
                   short: m
@@ -215,5 +224,5 @@ subcommands:
                   takes_value: false
               - json-config:
                   long: json-config
-                  help: Specify notes with json
+                  help: Specify todo with json
                   takes_value: true

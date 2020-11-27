@@ -1,12 +1,9 @@
 use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Debug, Display};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::{
-    any::Any,
-    fmt::{Debug, Display},
-};
 use std::{collections::HashMap, collections::HashSet, hash::Hash};
 
 #[derive(Serialize, Deserialize, Debug, Hash)]
@@ -152,7 +149,7 @@ impl Todo {
 impl Display for Todo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let tz = Local::now().timezone();
-        f.debug_struct("Note")
+        f.debug_struct("Todo")
             .field("title", &self.title)
             .field(
                 "due",
@@ -242,7 +239,7 @@ impl Store {
         match match &key[..] {
             "va::data_store::Note" => Store::_load_note(&mut value, raw),
             "va::data_store::Todo" => Store::_load_todo(&mut value, raw),
-            _ => panic!("UNKNOWN KEY!")
+            _ => panic!("UNKNOWN KEY!"),
         } {
             Ok(_) => Ok(value),
             Err(e) => Err(e),
@@ -266,7 +263,7 @@ impl Store {
             Err(e) => Err(e),
         }
     }
-    fn load_file(path: PathBuf) -> Result<String, std::io::Error> {
+    pub fn load_file(path: PathBuf) -> Result<String, std::io::Error> {
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -305,7 +302,18 @@ impl Store {
             Store(HashMap::new())
         }))
     }
+    fn save_file(data: String, path: PathBuf) -> Result<(), std::io::Error> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .unwrap();
+        file.write_all(data.as_bytes())
+    }
     pub fn save(&self) -> Result<(), std::io::Error> {
+        std::fs::create_dir_all(dirs::home_dir().unwrap().join(Path::new(".va")))?;
+        let path = dirs::home_dir().unwrap().join(Path::new(".va/store.json"));
         let serializable: HashMap<String, Vec<String>> = self
             .0
             .iter()
@@ -315,7 +323,7 @@ impl Store {
             })
             .collect();
         let data = serde_json::to_string(&serializable).unwrap();
-        write_to_file(data, "store.json")
+        Store::save_file(data, path)
     }
     pub fn show(&self) {
         println!("{:#?}", self);
@@ -382,12 +390,12 @@ impl Store {
             false
         }
     }
-    pub fn remove_vec<S: Storable>(&mut self, data: Vec<&Box<dyn Storable>>) -> bool {
+    pub fn remove_vec<S: Storable>(&mut self, data: Vec<Box<dyn Storable>>) -> bool {
         let key = std::any::type_name::<S>().to_string();
         if self.0.contains_key(&key) {
             let mut value: HashSet<Box<dyn Storable>> =
                 self.0.get_mut(&key).unwrap().drain().collect();
-            match data.into_iter().map(|d| value.remove(d)).any(|x| x) {
+            match data.iter().map(|d| value.remove(d)).any(|x| x) {
                 true => {
                     self.0.insert(key, value);
                     true
@@ -427,72 +435,37 @@ impl Store {
     }
 }
 
-#[allow(dead_code)]
-fn read_from_file(name: &str) -> Result<String, std::io::Error> {
-    std::fs::create_dir_all(dirs::home_dir().unwrap().join(Path::new(".va")))?;
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(
-            dirs::home_dir()
-                .unwrap()
-                .join(Path::new(&format!(".va/{}", name))),
-        )
-        .unwrap();
-    let mut result = String::new();
-    match file.read_to_string(&mut result) {
-        Ok(_) => Ok(result),
-        Err(e) => Err(e),
-    }
-}
-#[allow(dead_code)]
-fn write_to_file(data: String, name: &str) -> Result<(), std::io::Error> {
-    std::fs::create_dir_all(dirs::home_dir().unwrap().join(Path::new(".va")))?;
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(
-            dirs::home_dir()
-                .unwrap()
-                .join(Path::new(&format!(".va/{}", name))),
-        )
-        .unwrap();
-    file.write_all(data.as_bytes())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn test_read_from_file() {
-        let name = "test_read_from_file.txt";
-        match read_from_file(name) {
-            Ok(_s) => std::fs::remove_file(
-                dirs::home_dir()
-                    .unwrap()
-                    .join(Path::new(&format!(".va/test_read_from_file.txt"))),
-            )
-            .unwrap(),
-            Err(_) => panic!(),
-        }
-    }
-    #[test]
-    fn test_write_read_to_file() {
-        let data = String::from("test data!");
-        let name = "test_write_read_to_file.txt";
-        match write_to_file(data.clone(), name) {
-            Err(_e) => panic!(),
-            _ => (),
-        }
-        match read_from_file(name) {
-            Ok(s) if s == data => {
-                std::fs::remove_file(dirs::home_dir().unwrap().join(".va").join(name)).unwrap();
-            }
-            _ => panic!(),
-        }
-    }
+    // #[test]
+    // fn test_read_from_file() {
+    //     let name = "test_read_from_file.txt";
+    //     match read_from_file(name) {
+    //         Ok(_s) => std::fs::remove_file(
+    //             dirs::home_dir()
+    //                 .unwrap()
+    //                 .join(Path::new(&format!(".va/test_read_from_file.txt"))),
+    //         )
+    //         .unwrap(),
+    //         Err(_) => panic!(),
+    //     }
+    // }
+    // #[test]
+    // fn test_write_read_to_file() {
+    //     let data = String::from("test data!");
+    //     let name = "test_write_read_to_file.txt";
+    //     match write_to_file(data.clone(), name) {
+    //         Err(_e) => panic!(),
+    //         _ => (),
+    //     }
+    //     match read_from_file(name) {
+    //         Ok(s) if s == data => {
+    //             std::fs::remove_file(dirs::home_dir().unwrap().join(".va").join(name)).unwrap();
+    //         }
+    //         _ => panic!(),
+    //     }
+    // }
     #[test]
     fn test_create_note() {
         let mut test = Note::new();
